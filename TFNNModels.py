@@ -90,6 +90,37 @@ class TFNNModels:
         return model
     
 
+    def build_conv1D_model(self,n_timesteps,n_features,kernel_size):
+        '''
+        1D conv model
+        Input:
+            n_timesteps:
+            n_features:
+            kernal_size:
+        Return:
+            Conv NN model
+        
+        '''        
+        model = keras.Sequential(name="model_conv1D")
+        model.add(keras.layers.Input(shape=(n_timesteps,n_features)))
+        model.add(keras.layers.Conv1D(filters=64, kernel_size=kernel_size, activation='relu', name="Conv1D_1"))
+        model.add(keras.layers.Dropout(0.5))
+        model.add(keras.layers.Conv1D(filters=32, kernel_size=3, activation='relu', name="Conv1D_2"))
+    
+        model.add(keras.layers.Conv1D(filters=16, kernel_size=2, activation='relu', name="Conv1D_3"))
+    
+        model.add(keras.layers.MaxPooling1D(pool_size=2, name="MaxPooling1D"))
+        model.add(keras.layers.Flatten())
+        model.add(keras.layers.Dense(32, activation='relu', name="Dense_1"))
+        model.add(keras.layers.Dense(n_features, name="Dense_2"))
+
+
+        optimizer = tf.keras.optimizers.RMSprop(0.001)
+
+        model.compile(loss='mse',optimizer=optimizer,metrics=['mae'])
+        return model
+    
+
 
     def PredictMidPoint(self,model1x,model1y,model2x,model2y,input,maxlen):
         m1x = model1x.predict(input[0:maxlen])
