@@ -124,6 +124,98 @@ class DataGenPrep:
         else:
 
             return print("Error: Maxit must be greater or equal to 10 for proper scaling of data!")
+        
+    
+    def Data_Array2(self, BCrange,MaxIt):
+        '''
+        Input Arguments:
+        BCrange:8x2 array type.
+                contains boundary conditions in x direction.
+                [initial boundary , Goal boundary ]
+                [VI,VM1,VM2,VG,OI,OM1,OM2,OG1]
+
+        MaxIt:  int type.
+                number of observations. Batch size
+
+        Returns:
+
+
+        '''
+
+        DataArray = np.zeros([MaxIt,16])
+
+        i = 0
+        j = 0
+        k = 0
+
+        while(i<MaxIt):
+            while(j<16):
+
+                if(j%2==0): # This is for x coordinates
+                    DataArray[i,j] = np.random.randint(BCrange[k,0],BCrange[k,1])
+
+
+                    k=k+1
+                    j=j+1
+
+
+
+                    #if(j==(BCrange.shape[0]-1)):
+                    #k=0
+                    #j=j+1
+                    #else:
+                    #k=k+1
+                    #j=j+1
+
+
+
+                else:# This is for y coordinates
+                    DataArray[i,j] = np.random.randint(0,BCrange.max())
+
+                    j=j+1
+
+                    #if(j==BCrange.shape[0]-1):
+                    #k=0
+                    #j=j+1
+                    #else:
+
+                    #j=j+1
+
+
+            j=0
+            k=0
+            i=i+1
+
+
+        return DataArray.astype(int)
+    
+
+    def StaticRawInputTargetGen(self, myarray, MaxIt=10):
+        '''
+        Takes numpy array of Boundary range
+        
+        sacales the data and reuturns raw input for static model (VIX,VIY,VGX,VGY,OIX,OIY)
+        
+        return raw target (VIM1X,VIM1Y,VGM2X,VGM2Y)    
+        
+        parameter
+            Bcrange array
+        Return
+            rawinp array, rawtarget array
+        '''
+        if(MaxIt>=10):
+            dataset = self.Data_Array(myarray,MaxIt)
+            scdata = self.Scale_Data(dataset)
+            rawinp = np.array([scdata[:,0],scdata[:,1],scdata[:,6],scdata[:,7],scdata[:,8],scdata[:,9]])
+            rawinp =rawinp.T
+            rawtarget = np.array([scdata[:,2],scdata[:,3],scdata[:,4],scdata[:,5]])
+            rawtarget = rawtarget.T
+
+            return rawinp, rawtarget
+        
+        else:
+
+            return print("Error: Maxit must be greater or equal to 10 for proper scaling of data!")
 
 
         
