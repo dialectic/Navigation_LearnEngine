@@ -4,16 +4,18 @@ Created on Tue Mar 28 11:19:49 2023
 
 @author: ai598
 """
-
+import control as ct
+import numpy as np
 
 
 class NonLinVehicleSystem:
     def __init__(self,m,j,c): # constructor
-        import control as ct
-        import numpy as np
+
         self.m = m
         self.j = j
         self.c = c
+
+        print("Created Non Linear Vehicle Instance")
     
     # ------------------------------------getters-------------- 
     def get_m(self): 
@@ -36,27 +38,24 @@ class NonLinVehicleSystem:
     # setter method 
     def set_c(self, c): 
         self.c = c    
+    
+    def updt_wrapper(self):
 
-
+        """
+            Returns vehicle/agent state update function
+        """
         
-    #-----------------------------------------Methods--------------------    
+        def myvehicle_updt(t,x,u,params):
 
-    # Generate the Non-linear system
-    def RawSystem(self):
-        import control as ct
-        import numpy as np        
+            """
+                Updates vehicle/agent state variables
+            """
+            
+            m = params.get('m',self.m)
+            j = params.get('j',self.j)
+            c = params.get('c',self.c)
 
- 
-        # Nonlinear update function
-        def myvehicle_updt(t,x,u,params): 
-            import control as ct
-            import numpy as np                      
-
-            m = params.get('m',self.m)  # 50
-            j = params.get('j',self.j) #12.5
-            c = params.get('c',self.c) # .8
-        
-            # States
+            # state
             x1= x[0]
             x2= x[1]
             x3= x[2]
@@ -64,47 +63,199 @@ class NonLinVehicleSystem:
             x5= x[4]
             x6= x[5]
 
-            # Inputs
+            # input
             fx = u[0]
             fy = u[1]
             tz = u[2]
 
 
 
-            # State equations
-            dx1 = x4
-            dx2 = x5 
-            dx3 = x6
-            dx4 = (1/m)*fx*( np.cos(x3*(np.pi/180)) - np.sin(x3*(np.pi/180) )- c*x4 ) 
-            dx5 = (1/m)*fy*( np.sin(x3*(np.pi/180)) + np.cos(x3*(np.pi/180) )- c*x5 )
+            # dynamical equation
+            dx1 = x3
+            dx2 = x4
+            dx3 = (1/m)*fx*( np.cos(x5*(np.pi/180)) - np.sin(x5*(np.pi/180) )- c*x3 )
+            dx4 = (1/m)*fy*( np.sin(x5*(np.pi/180)) + np.cos(x5*(np.pi/180) )- c*x4 )
+            dx5 = x6
             dx6 = (1/j)*(tz - c*x6)
-        
+
             return [dx1,dx2,dx3,dx4,dx5,dx6]
         
-        
+        return myvehicle_updt
+    
+    def output_wrapper(self):
 
-        # Output function    
+        """
+            Returns output update function
+        """
 
         def myvehicle_out(t, x, u, param):
+            
             '''
-            retrun Output y 
+             Uupdates output parameters/variables
             '''
             return x[0:6]
+        
+        return myvehicle_out
+
+
+        
+    #-----------------------------------------Methods--------------------    
+
+    # Generate the Non-linear system
+    def OpenLoopSys(self): 
+        
+        """
+            Returns open loop system instance
+        """
 
         #myvehicle_updt = self.update_func()
         #myvehicle_out = self.Output_func()
-        nonlin_myvehicle = ct.NonlinearIOSystem(myvehicle_updt, myvehicle_out, inputs=['u1','u2','u3'], outputs=['x1','x2','x3','x4','x5','x6'], states=['x1','x2','x3','x4','x5','x6'] )
+        nonlin_myvehicle = ct.NonlinearIOSystem(self.updt_wrapper(), self.output_wrapper(), inputs=['u1','u2','u3'], outputs=['x1','x2','x3','x4','x5','x6'], states=['x1','x2','x3','x4','x5','x6'] )
 
         
 
         return nonlin_myvehicle 
+    
+
+
+
+    def FindEqPoint(self, nonlin_myvehicle, u0 = [0,0,0] , x0 = [1,2,.5,.1,50,.1] ):
+    
+        """
+            return Eq point
+            
+            Input 1: NonLinearIO system type object. Open Loop System instance
+            Input 2: List type. Intial input
+            Input 3: List type. Initial position
+            
+            return: numpy array. Eq Points for each state.
+        """
+        
+        eqpt = ct.find_eqpt(nonlin_myvehicle,x0,u0)
+        
+        return eqpt[0]
+
+    def LinearizeSysMat(self, nonlin_myvehicle,u0 = [0,0,0] , x0 = [1,2,.5,.1,50,.1] ):
+        """
+            Return system matrix after linearizing at Eq point
+            
+            Input 1: NonLinearIO system type object. Open Loop System instance
+            Input 2: List type. Intial input
+            Input 3: List type. Initial position
+            
+            return 1: A matrix
+            return 2: B matrix
+            return 3: C matrix
+            return 4: D matrix
+            
+            
+        """
+        
+        xeq = self.FindEqPoint(nonlin_myvehicle,u0,x0)
+        
+        lin_myvehicle = ct.linearize(nonlin_myvehicle,xeq,0)
+        
+        A=lin_myvehicle.A
+        B=lin_myvehicle.B
+        C=lin_myvehicle.C
+        D=lin_myvehicle.D
+        
+        return A,B,C,D
+    
+    
+
+    def PolePlaceKMatrix(self, nonlin_myvehicle, poles = [-2,-10,-8, -6, -9, -8.5],u0 = [0,0,0] , x0 = [1,2,.5,.1,50,.1] ):
+        """
+        
+            returns K matrix 
+            
+            Input 1: NonLinearIO system type object. Open Loop System instance
+            Input 2: List type. Pole positions
+            Input 3: List type. Intial input
+            Input 4: List type. Initial position
+            
+            return 1: numpy array type. K matrix
+            return 2: numpy array type. Knew matrix
+            return 3: numpy array type. Kpos matrix
+        
+        
+        """
+        
+        A,B,C,D = self.LinearizeSysMat(nonlin_myvehicle , u0 , x0)
+        
+        K = ct.place(A,B, poles)
+        
+        K3=K[:,2]
+        K4=K[:,3]
+        K6=K[:,5]
+
+        K1=K[:,0]
+        K2=K[:,1]
+        K5=K[:,4]
+
+        Knew = np.array([K3,K4,K6])
+        Knew = np.transpose(Knew)
+
+        Kpos = np.array([K1,K2,K5])
+        Kpos = np.transpose(Kpos)
+        
+        return K, Knew, Kpos
+
+    def StateFeedbackPosControl(self, nonlin_myvehicle, poles = [-2,-10,-8, -6, -9, -8.5], u0 = [0,0,0] , x0 = [1,2,.5,.1,50,.1]):
+        
+        """
+            Close loop system with state feedback controller
+
+            Input 1: NonLinearIO system type object. Open Loop System instance
+            Input 2: List type. Pole positions
+            Input 3: List type. Intial input
+            Input 4: List type. Initial position
+
+            return: feedback/IO system object. Close loop system with state feedback controller.
+        """
+        K, Knew, Kpos = self.PolePlaceKMatrix(nonlin_myvehicle, poles, u0, x0  )
+
+        feed_nonlin_vehicle = ct.feedback(nonlin_myvehicle,K,sign=-1)
+
+        return feed_nonlin_vehicle
+
+    def StateFeedbackPosInputResponse(self, Timespan, Input = [1,1,1],  poles = [-2,-10,-8, -6, -9, -8.5], u0 = [0,0,0] , x0 = [1,2,.5,.1,50,.1], Xir = [1,0,0,0,0,0]):
+        
+        """
+        Close loop system response
+
+        
+        Input 1: numpy array. Time vector
+        Input 2: list type. unitary input
+        Input 3: List type. Pole positions
+        Input 4: List type. Intial input
+        Input 5: List type. Initial position for Equilibrium point
+        Input 6: List type. Initial position for time response
+
+        return 1: 1D array type. response time vector
+        return 2: (n x T)D array type where n = number of states. T = time period
+        """
+
+
+        # Input array
+        inp = np.ones(Timespan.shape)
+        R = np.array([inp*Input[0],inp*Input[1],inp*Input[2]])
+
+        nonlin_myvehicle = self.OpenLoopSys()
+
+        K, Knew, Kpos = self.PolePlaceKMatrix(nonlin_myvehicle, poles, u0, x0  )
+
+        feed_nonlin_vehicle = self.StateFeedbackPosControl(nonlin_myvehicle, poles , u0 , x0)
+
+        t, y = ct.input_output_response(feed_nonlin_vehicle, Timespan , Kpos@R, Xir)
+
+        return t, y
 
 
 # --------------------------------------CONTROLLER
 
     def GainMatK(self):
-        import control as ct
-        import numpy as np
+
         # find equilibrium points
         u0 =np.array([0,0,0]) # no control 
         x0 = np.array([1,2,50,.5,.1,.1])
@@ -135,8 +286,7 @@ class NonLinVehicleSystem:
 
     # position controller
     def PosControlSystem(self):
-        import control as ct
-        import numpy as np
+       
         Kp,Kv,K = self.GainMatK()
 
         sysK  = ct.append(K)
@@ -160,8 +310,7 @@ class NonLinVehicleSystem:
 
     # velocity constroller
     def VelControlSystem(self):
-        import control as ct
-        import numpy as np
+
         Kp,Kv,K = self.GainMatK()
 
         sysK  = ct.append(K)
