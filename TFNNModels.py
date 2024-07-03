@@ -58,7 +58,7 @@ class TFNNModels:
         return model
 
 
-    def DNN_FFSeqSGD_Regulized(self,Learn_Rate_Schedule = True):
+    def DNN_FFSeqSGD_Regulized(self,Learn_Rate_Schedule = True,metrics = 'mae'):
         model = keras.Sequential()
         #model.add(layers.Flatten())
         model.add(layers.Dense(6,activation='relu') ) # extra layer 1  ,input_shape=(train_input.shape[1],)
@@ -86,7 +86,7 @@ class TFNNModels:
             clipvalue=None,
             global_clipnorm=None,
             name="SGD"),
-            loss='mse', metrics=['mean_squared_error'],)
+            loss='mse', metrics=[metrics],)
         return model
     
 
